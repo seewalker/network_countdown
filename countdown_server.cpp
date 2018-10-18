@@ -10,7 +10,7 @@
  *  setsockopt has a "level" argument which can be used to set options within TCP or at the higher socket level. that's where the constant SOL_SOCKET plays a role.
  */
 
-#include <optional>
+#include <experimental/optional>
 #include <numeric>
 #include "countdown_common.cpp"
 
@@ -141,8 +141,8 @@ std::vector<int> client_socks(std::vector<struct client_meta> metas) {
 int main(int argc, char **argv) {
     int listen_sock,port,hi_sock,ret,client_sock,ping_n,n_countdowns=0,i,j,msglen,msglen_synch,seq;
     std::vector<client_meta> client_metas;
-    std::optional<std::string> lock_owner = std::nullopt;
-	std::string msg;
+    std::experimental::optional<std::string> lock_owner = std::experimental::nullopt;
+    std::string msg;
     std::time_t t0,tf;
     // the synchronous one is for sending and recieving messages synchronously within an asynch event.
     char msgbuf[MAX_MSGLEN],msgbuf_synch[MAX_MSGLEN];
@@ -221,7 +221,7 @@ int main(int argc, char **argv) {
                                 try {
                                     std::string lock_nickname,lock_date;
                                     lock_nickname = parse_lock_msg(msgbuf,lock_date);
-                                    if (lock_owner != std::nullopt) {
+                                    if (lock_owner != std::experimental::nullopt) {
                                         std::cerr << "Warning, multiple people typing command at once" << std::endl;
                                     }
                                     else {
@@ -241,7 +241,7 @@ int main(int argc, char **argv) {
                                         std::cerr << "Warning, got unlock message from someone other than current lock owner." << std::endl;
                                     }
                                     else {
-                                        lock_owner = std::nullopt;
+                                        lock_owner = std::experimental::nullopt;
                                     }
                                 }
                                 catch (const std::exception& e) {
