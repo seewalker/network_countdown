@@ -5,6 +5,9 @@ else
 CXX=clang++
 endif 
 CXXFLAGS=-std=c++17 -g
+
+all: client server
+
 client: countdown_client.cpp
 	${CXX} ${CXXFLAGS} countdown_client.cpp -o $@
 server: countdown_server.cpp

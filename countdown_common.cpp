@@ -168,7 +168,7 @@ std::string parse_goodbye(std::string cmd) {
     return parse_greeting_common("goodbye",cmd);
 }
 
-// recv until newline.
+// this is currently infinite-looping.
 int recvloop(int fd,char *buf) {
     int buf_ptr = 0,count;
     do {
@@ -179,7 +179,7 @@ int recvloop(int fd,char *buf) {
         if (buf_ptr > MAX_MSGLEN) {
 
         }
-    } while (buf[buf_ptr] != '\n');
+    } while (buf[buf_ptr-1] != '\n' && buf[buf_ptr] != '\0');
     return buf_ptr;
 }
 
