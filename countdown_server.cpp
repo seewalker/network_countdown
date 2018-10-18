@@ -10,14 +10,8 @@
  *  setsockopt has a "level" argument which can be used to set options within TCP or at the higher socket level. that's where the constant SOL_SOCKET plays a role.
  */
 
-#include <unistd.h>
-#include <stdio.h>
-#include <sys/socket.h>
-#include <stdlib.h>
-#include <netinet/in.h>
-#include <string.h>
-#include <algorithm>
-#include "cxxopts.hpp"
+#include <optional>
+#include <numeric>
 #include "countdown_common.cpp"
 
 #define EXTERNAL_IPV4 "45.33.122.23"
@@ -74,23 +68,23 @@ int init_socket(int &sock,int port) {
     return 0;
 }
 
-char* repr_adr(struct sockaddr_in addr) {
-    char *ipv4 = malloc(INET_ADDRSTRLEN);
+char* repr_addr(struct sockaddr_in addr) {
+    char *ipv4 = new char[INET_ADDRSTRLEN];
     inet_ntop(AF_INET,&addr.sin_addr,ipv4,INET_ADDRSTRLEN);
     return ipv4;
 }
 
-int process_connection(int listen_sock,struct sockaddr_in &addr) {
+int process_connection(int listen_sock,struct sockaddr_in *addr) {
     char *client_ipv4;
-    int client_len,sock;
-
+    int sock;
+	socklen_t client_len;
     client_len = sizeof(addr);
-    memset(&addr,0,client_len);
-    if ((sock = accept(listen_sock,(struct sockaddr *)&addr,&client_len)) < 0) {
+    memset(addr,0,client_len);
+    if ((sock = accept(listen_sock,(struct sockaddr *)addr,&client_len)) < 0) {
         std::cerr << " " << std::endl;
         return -1;
     }
-    client_ipv4 = repr_addr(addr);
+    client_ipv4 = repr_addr(*addr);
     std::cout << "New connection from " << client_ipv4 << std::endl;
     return sock;
 }
@@ -106,30 +100,54 @@ void mk_server_fd_sets(int listen_socket,std::vector<int> client_sockets,fd_set 
     FD_ZERO(except_fds);
 }
 
+// Messages only the server will send.
 std::string ping_init_msg(int ping_n) {
     std::ostringstream oss;
     oss << "init_ping " << ping_n << std::endl;
     return validate_wrap(oss.str());
 }
 
+std::string countdown_order_msg(int start_idx,double delay) {
+    std::ostringstream oss;
+    oss << "countdown_order " << start_idx << " " << delay << std::endl;
+    return validate_wrap(oss.str());
+}
+
 // to broacast to literally everyone, use a negative mask.
 // to relay to everyone but original sender, use mask with relevant fd.
 int broadcast(int mask,std::vector<struct client_meta> client_metas,char *msgbuf, int msglen) {
+    int all_success = 1;
     int j;
     for(j=0;j<client_metas.size();++j) {
         if (j != mask) {
             // broadcast the goodbye message.
-            write(client_metas[j].sock,msgbuf,msglen);
+            if (write(client_metas[j].sock,msgbuf,msglen) < 0) {
+                std::cerr << "Failed to write during broadcast on client " << client_metas[j].sock << std::endl;
+                all_success = 0;
+            }
         }
     }
+    return all_success;
 }
 
-int main( ) {
-    int listen_sock,port,hi_sock,ret,client_sock,ping_n,n_countdowns=0;
+std::vector<int> client_socks(std::vector<struct client_meta> metas) {
+    std::vector<int> socks;
+    for (auto m : metas) {
+        socks.push_back(m.sock);
+    }
+    return socks;
+}
+
+int main(int argc, char **argv) {
+    int listen_sock,port,hi_sock,ret,client_sock,ping_n,n_countdowns=0,i,j,msglen,msglen_synch,seq;
     std::vector<client_meta> client_metas;
     std::optional<std::string> lock_owner = std::nullopt;
-    char msgbuf[MAX_MSGLEN];
+	std::string msg;
+    std::time_t t0,tf;
+    // the synchronous one is for sending and recieving messages synchronously within an asynch event.
+    char msgbuf[MAX_MSGLEN],msgbuf_synch[MAX_MSGLEN];
     std::string t_sent;
+    fd_set read_fds,write_fds,except_fds;
     cxxopts::Options options("Countdown Client","A program that will coordinate a countdown.");
     // Tne number of pings applies both to the before and after of a countdown (the first one, to get up-to-date estimates on latencies. the latter to see how close it was to a successful countdown.).
     options.add_options()
@@ -146,14 +164,15 @@ int main( ) {
         std::cerr << e.what() << std::endl;
         return -1;
     }
-    init_socket(listen_sock);
+    init_socket(listen_sock,port);
     while (true) {
-        mk_server_fd_sets(listen_socket,client_socks,&read_fds,&write_fds,&except_fds);
-        if (client_socks.size == 0) {
+        auto cs = client_socks(client_metas);
+        mk_server_fd_sets(listen_sock,cs,&read_fds,&write_fds,&except_fds);
+        if (client_metas.size() == 0) {
             hi_sock = listen_sock;
         }
         else {
-            auto argmax = std::max_element(client_socks.begin(),client_socks.end());
+            auto argmax = std::max_element(cs.begin(),cs.end());
             hi_sock = *argmax;
         }
         ret = select(hi_sock + 1,&read_fds,&write_fds,&except_fds,NULL);
@@ -166,11 +185,9 @@ int main( ) {
                 break;
             default:
                 if (FD_ISSET(listen_sock,&read_fds)) {
-                    struct sockaddr_in client_addr;
                     struct client_meta meta;
-                    if ((client_sock = process_connection(listen_sock,client_addr)) > 0) {
+                    if ((client_sock = process_connection(listen_sock,&meta.addr)) > 0) {
                         meta.sock = client_sock;
-                        meta.addr = client_addr;
                         client_metas.push_back(meta);
                     }
                     else {
@@ -181,7 +198,7 @@ int main( ) {
                     write(client_sock,msg.c_str(),msg.length());
                 }
                 std::vector<int> delete_idxs;
-                for (i=0;i<client_metas.size; ++i) {
+                for (i=0;i<client_metas.size(); ++i) {
                     auto & client_meta = client_metas[i];
                     if (FD_ISSET(client_meta.sock,&read_fds)) {
                         // do the recv into recvbuf
@@ -189,18 +206,21 @@ int main( ) {
                         switch (classify(msgbuf)) {
                             case GREETING:
                                 try {
-                                    client_meta.nickname = parse_greeting(msgbuf,t_sent);
+                                    client_meta.nickname = parse_hello(msgbuf);
+                                }
+                                catch (const std::exception& e) {
+
                                 }
                                 break;
-                                broadcast( );
+                                broadcast(i,client_metas,msgbuf,msglen);
                             case GOODBYE:
                                 delete_idxs.push_back(i);
-                                broadcast( );
+                                broadcast(i,client_metas,msgbuf,msglen);
                                 break;
                             case PEER_LOCK:
                                 try {
                                     std::string lock_nickname,lock_date;
-                                    parse_lock_msg(recvbuf,lock_nickname,lock_date);
+                                    lock_nickname = parse_lock_msg(msgbuf,lock_date);
                                     if (lock_owner != std::nullopt) {
                                         std::cerr << "Warning, multiple people typing command at once" << std::endl;
                                     }
@@ -208,12 +228,15 @@ int main( ) {
                                         lock_owner = lock_nickname;
                                     }
                                 }
-                                broadcast( );
+                                catch (const std::exception& e) {
+
+                                }
+                                broadcast(i,client_metas,msgbuf,msglen);
                                 break;
                             case PEER_UNLOCK:
                                 try {
                                     std::string lock_nickname,lock_date;
-                                    parse_unlock_msg(recvbuf,lock_nickname,lock_date);
+                                    lock_nickname = parse_unlock_msg(msgbuf,lock_date);
                                     if (lock_owner != lock_nickname) {
                                         std::cerr << "Warning, got unlock message from someone other than current lock owner." << std::endl;
                                     }
@@ -221,22 +244,40 @@ int main( ) {
                                         lock_owner = std::nullopt;
                                     }
                                 }
-                                broadcast( );
+                                catch (const std::exception& e) {
+
+                                }
+                                broadcast(i,client_metas,msgbuf,msglen);
                                 break;
-                            case WRITE_ARBITRARY:
-                                broadcast( );
+                            case WRITE_ARBITARY:
+                                broadcast(i,client_metas,msgbuf,msglen);
                                 break;
                             case COUNTDOWN_N:
-                                // take the countdown message, add a n_countdowns value to it. then the clients should ACK that value.
+                                // do the synchronous ping loops.
                                 for(i=0;i<ping_n;++i) {
                                     msg = ping_msg(i);
-                                    for(j=0;j<client_socks.size();++j) {
-                                        auto t0 = now();
-                                        write(client_socks[i],msg,msg.length());
+                                    for(j=0;j<client_metas.size();++j) {
+                                        t0 = now();
+                                        write(client_metas[i].sock,msg.c_str(),msg.length());
                                         // I should automate the recv loop for these messages.
-                                        recvloop(client_socks[i]);
+                                        recvloop(client_metas[i].sock,msgbuf);
+                                        tf = now();
+                                        try {
+                                            seq = parse_ping_msg(msg);
+                                            if (seq != i) {
+                                                std::cerr << "Recieved out of order sequence number from client" << std::endl;
+                                            }
+                                            else {
+                                                client_metas[i].rtts.push_back(tf-t0);
+                                            }
+                                        }
+                                        catch (const std::exception& e ) {
+                                            std::cerr << "Recieved malformed ping message" << std::endl;
+                                        }
                                     }
                                 }
+                                // -1 means send even to the originating client.
+                                broadcast(-1,client_metas,msgbuf,msglen);
                                 ++n_countdowns;
                                 break;
                             case PING:
