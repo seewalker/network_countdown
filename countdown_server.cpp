@@ -138,12 +138,12 @@ std::vector<int> client_socks(std::vector<struct client_meta> metas) {
 }
 
 int main(int argc, char **argv) {
-    int listen_sock,port,hi_sock,ret,client_sock,ping_n,n_countdowns=0,i,j,msglen,seq;
+    int listen_sock,port,hi_sock,ret,client_sock,ping_n,n_countdowns=0,i,j,msglen,msglen_synch,seq;
     std::vector<client_meta> client_metas;
     std::experimental::optional<std::string> lock_owner = std::experimental::nullopt;
     std::string msg,t_sent;
     std::time_t t0,tf;
-    char msgbuf[MAX_MSGLEN],msgbuf_synch[MAX_MSGLEN];;
+    char msgbuf[MAX_MSGLEN],msgbuf_synch[MAX_MSGLEN];
     fd_set read_fds,write_fds,except_fds;
     cxxopts::Options options("Countdown Client","A program that will coordinate a countdown.");
     // Tne number of pings applies both to the before and after of a countdown (the first one, to get up-to-date estimates on latencies. the latter to see how close it was to a successful countdown.).
@@ -270,11 +270,12 @@ int main(int argc, char **argv) {
                             case COUNTDOWN_N:
                                 // do the synchronous ping loops.
                                 for(i=0;i<ping_n;++i) {
-                                    msg = ping_msg(i);
+                                    strcpy(msgbuf_synch,ping_msg(i).c_str());
+                                    msglen_synch = strlen(msgbuf_synch);
                                     for(j=0;j<client_metas.size();++j) {
                                         t0 = now();
-                                        write(client_metas[i].sock,msg.c_str(),msg.length());
-                                        // I should automate the recv loop for these messages.
+                                        // this line is misbehaving somehow, i think.
+                                        write(client_metas[i].sock,msgbuf_synch,msglen_synch);
                                         try {
                                             recvloop(client_metas[i].sock,msgbuf_synch); // will throw if needs to.
                                             tf = now();
