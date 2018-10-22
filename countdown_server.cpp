@@ -138,14 +138,12 @@ std::vector<int> client_socks(std::vector<struct client_meta> metas) {
 }
 
 int main(int argc, char **argv) {
-    int listen_sock,port,hi_sock,ret,client_sock,ping_n,n_countdowns=0,i,j,msglen,msglen_synch,seq;
+    int listen_sock,port,hi_sock,ret,client_sock,ping_n,n_countdowns=0,i,j,msglen,seq;
     std::vector<client_meta> client_metas;
     std::experimental::optional<std::string> lock_owner = std::experimental::nullopt;
-    std::string msg;
+    std::string msg,t_sent;
     std::time_t t0,tf;
-    // the synchronous one is for sending and recieving messages synchronously within an asynch event.
-    char msgbuf[MAX_MSGLEN],msgbuf_synch[MAX_MSGLEN];
-    std::string t_sent;
+    char msgbuf[MAX_MSGLEN],msgbuf_synch[MAX_MSGLEN];;
     fd_set read_fds,write_fds,except_fds;
     cxxopts::Options options("Countdown Client","A program that will coordinate a countdown.");
     // Tne number of pings applies both to the before and after of a countdown (the first one, to get up-to-date estimates on latencies. the latter to see how close it was to a successful countdown.).
@@ -278,29 +276,24 @@ int main(int argc, char **argv) {
                                         write(client_metas[i].sock,msg.c_str(),msg.length());
                                         // I should automate the recv loop for these messages.
                                         try {
-                                            auto ping_ret = recvloop(client_metas[i].sock,msgbuf);
+                                            recvloop(client_metas[i].sock,msgbuf_synch); // will throw if needs to.
+                                            tf = now();
+                                            seq = parse_ping_msg(msgbuf_synch);
+                                            if (seq == i) {
+                                                client_metas[i].rtts.push_back(tf-t0);
+                                            }
+                                            else {
+                                                std::cerr << "Recieved out of order sequence number from client" << std::endl;
+                                            }
                                         }
                                         catch (const std::exception& e ) {
 
-                                        }
-                                        tf = now();
-                                        try {
-                                            seq = parse_ping_msg(msg);
-                                            if (seq != i) {
-                                                std::cerr << "Recieved out of order sequence number from client" << std::endl;
-                                            }
-                                            else {
-                                                client_metas[i].rtts.push_back(tf-t0);
-                                            }
-                                        }
-                                        catch (const std::exception& e ) {
-                                            std::cerr << "Recieved malformed ping message" << std::endl;
                                         }
                                     }
                                 }
                                 // -1 means send even to the originating client.
                                 if (broadcast(-1,client_metas,msgbuf,msglen) > 0) {
-                                    std::cerr << "Countdown failed to broadcast perfectly." << std::endl; 
+                                    std::cerr << "Countdown failed to broadcast perfectly." << std::endl;
                                 }
                                 ++n_countdowns;
                                 break;

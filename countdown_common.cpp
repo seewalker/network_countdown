@@ -186,6 +186,7 @@ std::string parse_goodbye(std::string cmd) {
     return parse_greeting_common("goodbye",cmd);
 }
 
+// returns number of characters read.
 int recvloop(int fd,char *buf) {
     int buf_ptr = 0,count;
     do {
@@ -210,7 +211,6 @@ void parse_lock_common(std::string target,std::string cmd,std::string &nickname,
     std::string msg_t;
     std::istringstream iss(cmd);
     iss >> msg_t;
-    size_t begin_date,end_date,i=0;
     if (msg_t != target) {
         throw std::domain_error(" ");
     }

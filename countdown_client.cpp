@@ -129,14 +129,12 @@ void mk_client_fd_sets(int srv_socket,fd_set *read_fds,fd_set *write_fds,fd_set 
 int main (int argc, char **argv) {
     // parse command line arguments.
     std::string nickname,server,cmd,write_buffer,srv_buffer,msg,t_sent,peer_name,cmdline;
-    int port,srv_socket,count,msglen,ping_n=-1,countdown_start,i,seq,msglen_synch;
+    int port,srv_socket,ping_n=-1,countdown_start,i,seq,msglen_synch;
     double countdown_delay;
     std::vector<std::string> peer_names;
     struct sockaddr_in srv_addr;
     fd_set read_fds,write_fds,except_fds;
     char srv_readbuf[MAX_MSGLEN],msgbuf_synch[MAX_MSGLEN];
-    int srv_readbuf_ptr = 0;
-    bool peer_writing = false;
 
     cxxopts::Options options("Countdown Client","A program that will coordinate a countdown.");
     // Parse Command Line Args
@@ -220,6 +218,12 @@ int main (int argc, char **argv) {
                 }
                 if (FD_ISSET(srv_socket,&read_fds)) {
 					recvloop(srv_socket,srv_readbuf);
+                    try {
+                        auto verified = validate_wrap(srv_readbuf);
+                    }
+                    catch (const std::exception& e) {
+                        std::cerr << "Warning: the incoming message does not pass checks." << std::endl;
+                    }
 					switch (classify(srv_readbuf)) {
 						case HELLO:
 							try {
@@ -242,6 +246,7 @@ int main (int argc, char **argv) {
 						case PING_INIT:
                             try {
                                 ping_n = parse_ping_init_msg(srv_readbuf);
+                                std::cout << "Set ping_n =" << ping_n << std::endl;
                             }
                             catch (const std::exception& e ) {
 
@@ -257,6 +262,8 @@ int main (int argc, char **argv) {
                                 if (seq != 0) {
 
                                 }
+                                // reply back to the first ping.
+                                write(srv_socket,srv_readbuf,strlen(srv_readbuf));
                             }
                             catch (const std::exception& e ) {
 
