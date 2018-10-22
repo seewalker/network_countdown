@@ -14,6 +14,10 @@
 #include <chrono>
 #include "cxxopts.hpp"
 
+#define DEFAULT_SERVER "45.33.122.23"
+#define DEFAULT_PORT "9573"
+#define DEFAULT_PING_N "3"
+
 enum msg_t {
     HELLO = 0,
     GOODBYE = 8,

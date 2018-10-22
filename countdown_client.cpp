@@ -146,10 +146,19 @@ int main (int argc, char **argv) {
     // Parse Command Line Args
     options.add_options()
         ("n,nickname","Nickname",cxxopts::value<std::string>())
-        ("p,port","Port",cxxopts::value<int>())
-        ("s,server","Server",cxxopts::value<std::string>())
+        ("p,port","Port",cxxopts::value<int>()->default_value(DEFAULT_PORT))
+        ("s,server","Server",cxxopts::value<std::string>()->default_value(DEFAULT_SERVER))
     ;
     auto result = options.parse(argc,argv);
+    if (!result.count("nickname")) {
+        std::cerr << "You must provide a nickname, refer to the help." << std::endl;
+        std::cout << options.help({}) << std::endl;
+        return 1;
+    }
+    if (result.count("help")) {
+        std::cout << options.help({}) << std::endl;
+        return 0;
+    }
     try {
         nickname = result["nickname"].as<std::string>();
         server = result["server"].as<std::string>();

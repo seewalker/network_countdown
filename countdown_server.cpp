@@ -14,7 +14,6 @@
 #include <numeric>
 #include "countdown_common.cpp"
 
-#define EXTERNAL_IPV4 "45.33.122.23"
 
 const int BACKLOG = 10;
 
@@ -151,10 +150,15 @@ int main(int argc, char **argv) {
     cxxopts::Options options("Countdown Client","A program that will coordinate a countdown.");
     // Tne number of pings applies both to the before and after of a countdown (the first one, to get up-to-date estimates on latencies. the latter to see how close it was to a successful countdown.).
     options.add_options()
-        ("p,port","Port",cxxopts::value<int>())
-        ("n,ping_n","Number of pings",cxxopts::value<int>())
+        ("p,port","Port",cxxopts::value<int>()->default_value(DEFAULT_PORT))
+        ("n,ping_n","Number of pings",cxxopts::value<int>()->default_value(DEFAULT_PING_N))
+        ("help", "Print help")
     ;
     auto result = options.parse(argc,argv);
+    if (result.count("help")) {
+        std::cout << options.help({}) << std::endl;
+        return 0;
+    }
     try {
         port = result["port"].as<int>();
         ping_n = result["ping_n"].as<int>();
@@ -164,6 +168,7 @@ int main(int argc, char **argv) {
         std::cerr << e.what() << std::endl;
         return -1;
     }
+    std::cout << "Starting with port = " << port << ", ping_n = " << ping_n << std::endl;
     init_socket(listen_sock,port);
     while (true) {
         auto cs = client_socks(client_metas);
