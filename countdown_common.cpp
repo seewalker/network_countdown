@@ -186,9 +186,12 @@ std::string parse_goodbye(std::string cmd) {
     return parse_greeting_common("goodbye",cmd);
 }
 
-// returns number of characters read.
 int recvloop(int fd,char *buf) {
-    int buf_ptr = 0,count;
+    int buf_ptr = 0,count,i;
+    // since the buffers may be reused, zero it out between.
+    for (i=0;i<MAX_MSGLEN;++i) {
+        buf[i] = '\0';
+    }
     do {
         if ((count = recv(fd,buf + buf_ptr,MAX_MSGLEN,0)) < 0) {
             perror("recvloop error: ");
