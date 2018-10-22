@@ -76,6 +76,9 @@ int parse_ping_init_msg(std::string cmd) {
         throw std::domain_error(" ");
     }
     iss >> n;
+    if (n < 1) {
+        throw std::domain_error(" ");
+    }
     return n;
 }
 
@@ -131,6 +134,7 @@ int main (int argc, char **argv) {
     std::string nickname,server,cmd,write_buffer,srv_buffer,msg,t_sent,peer_name,cmdline;
     int port,srv_socket,ping_n=-1,countdown_start,i,seq,msglen_synch;
     double countdown_delay;
+    bool chatty;
     std::vector<std::string> peer_names;
     struct sockaddr_in srv_addr;
     fd_set read_fds,write_fds,except_fds;
@@ -142,6 +146,8 @@ int main (int argc, char **argv) {
         ("n,nickname","Nickname",cxxopts::value<std::string>())
         ("p,port","Port",cxxopts::value<int>()->default_value(DEFAULT_PORT))
         ("s,server","Server",cxxopts::value<std::string>()->default_value(DEFAULT_SERVER))
+        ("chatty","Chatty",cxxopts::value<bool>()->default_value("false"))
+        ("help", "Print help")
     ;
     auto result = options.parse(argc,argv);
     if (!result.count("nickname")) {
@@ -157,6 +163,7 @@ int main (int argc, char **argv) {
         nickname = result["nickname"].as<std::string>();
         server = result["server"].as<std::string>();
         port = result["port"].as<int>();
+        chatty = result["chatty"].as<bool>();
     }
     catch(cxxopts::OptionException e) {
         std::cerr << "Option Error:" << std::endl;
@@ -246,7 +253,7 @@ int main (int argc, char **argv) {
 						case PING_INIT:
                             try {
                                 ping_n = parse_ping_init_msg(srv_readbuf);
-                                std::cout << "Set ping_n =" << ping_n << std::endl;
+                                if (chatty) { std::cout << "Set ping_n =" << ping_n << std::endl; }
                             }
                             catch (const std::exception& e ) {
 
@@ -254,9 +261,6 @@ int main (int argc, char **argv) {
 							break;
 						case PING: //this should only happen asynchronously for the first ping message, others are synchronous..
                             // very nice, ready to do implement client ping.
-                            if (ping_n < 1) {
-                                std::cerr << " " << std::endl;
-                            }
                             try {
                                 seq = parse_ping_msg(srv_readbuf);
                                 if (seq != 0) {
