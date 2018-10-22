@@ -115,18 +115,18 @@ std::string countdown_order_msg(int start_idx,double delay) {
 // to broacast to literally everyone, use a negative mask.
 // to relay to everyone but original sender, use mask with relevant fd.
 int broadcast(int mask,std::vector<struct client_meta> client_metas,char *msgbuf, int msglen) {
-    int all_success = 1;
+    int n_fail = 0;
     int j;
     for(j=0;j<client_metas.size();++j) {
         if (j != mask) {
             // broadcast the goodbye message.
             if (write(client_metas[j].sock,msgbuf,msglen) < 0) {
                 std::cerr << "Failed to write during broadcast on client " << client_metas[j].sock << std::endl;
-                all_success = 0;
+                ++n_fail;
             }
         }
     }
-    return all_success;
+    return n_fail;
 }
 
 std::vector<int> client_socks(std::vector<struct client_meta> metas) {
@@ -213,7 +213,9 @@ int main(int argc, char **argv) {
                                 try {
                                     client_meta.nickname = parse_hello(msgbuf);
                                     std::cout << "Got hello message from " << client_meta.nickname << std::endl;
-                                    broadcast(i,client_metas,msgbuf,msglen);
+                                    if (broadcast(i,client_metas,msgbuf,msglen) > 0) {
+                                        std::cerr << "" << std::endl;
+                                    }
                                 }
                                 catch (const std::exception& e) {
                                     std::cerr << "Could not extract nickname from hello message, so not passing it along." << std::endl;
@@ -222,7 +224,9 @@ int main(int argc, char **argv) {
                                 break;
                             case GOODBYE:
                                 delete_idxs.push_back(i);
-                                broadcast(i,client_metas,msgbuf,msglen);
+                                if (broadcast(i,client_metas,msgbuf,msglen) > 0) {
+                                    
+                                }
                                 break;
                             case PEER_LOCK:
                                 try {
@@ -234,7 +238,9 @@ int main(int argc, char **argv) {
                                     else {
                                         lock_owner = lock_nickname;
                                     }
-                                    broadcast(i,client_metas,msgbuf,msglen);
+                                    if (broadcast(i,client_metas,msgbuf,msglen) > 0) {
+                                        
+                                    }
                                 }
                                 catch (const std::exception& e) {
                                     std::cerr << "Could not parse lock message, so not passing it anywhere." << std::endl;
@@ -250,14 +256,18 @@ int main(int argc, char **argv) {
                                     else {
                                         lock_owner = std::experimental::nullopt;
                                     }
+                                    if (broadcast(i,client_metas,msgbuf,msglen) > 0) {
+                                       
+                                    }
                                 }
                                 catch (const std::exception& e) {
 
                                 }
-                                broadcast(i,client_metas,msgbuf,msglen);
                                 break;
                             case WRITE_ARBITARY:
-                                broadcast(i,client_metas,msgbuf,msglen);
+                                if (broadcast(i,client_metas,msgbuf,msglen) > 0) {
+                                    
+                                }
                                 break;
                             case COUNTDOWN_N:
                                 // do the synchronous ping loops.
@@ -289,7 +299,9 @@ int main(int argc, char **argv) {
                                     }
                                 }
                                 // -1 means send even to the originating client.
-                                broadcast(-1,client_metas,msgbuf,msglen);
+                                if (broadcast(-1,client_metas,msgbuf,msglen) > 0) {
+                                    std::cerr << "Countdown failed to broadcast perfectly." << std::endl; 
+                                }
                                 ++n_countdowns;
                                 break;
                             case PING:

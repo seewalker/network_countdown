@@ -4,7 +4,7 @@ CXX=clang++-6.0
 else
 CXX=clang++
 endif 
-CXXFLAGS=-std=c++17 -g
+CXXFLAGS=-std=c++17 -g -Wall
 
 all: client server
 

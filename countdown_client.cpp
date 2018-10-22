@@ -41,18 +41,21 @@ std::string format_say_raw(std::string saying) {
 }
 
 
-std::string lock_msg(std::string nickname) {
+std::string lock_common_msg(std::string msg_t, std::string nickname) {
    std::ostringstream oss;
    auto t = now();
-   oss << "lock " << nickname << " " << "(" << std::ctime(&t) << ")" << std::endl;
+   char *t_repr = std::ctime(&t);
+   // remove trailing newline.
+   t_repr[strlen(t_repr)-1] = '\0';
+   oss << msg_t << " " << nickname << " " << "(" << t_repr << ")" << std::endl;
    return validate_wrap(oss.str());
+}
+std::string lock_msg(std::string nickname) {
+    return lock_common_msg("lock",nickname);
 }
 
 std::string unlock_msg(std::string nickname) {
-   std::ostringstream oss;
-   auto t = now();
-   oss << "unlock " << nickname << " " << "(" << std::ctime(&t) << ")" << std::endl;
-   return validate_wrap(oss.str());
+    return lock_common_msg("unlock",nickname);
 }
 
 std::string countdown_n_msg(int start_idx) {
@@ -90,34 +93,28 @@ void parse_countdown_order_msg(std::string cmd,int &start_idx,double &delay) {
 }
 
 // this is parsing what is coming in over the command line.
+// buf is a whole line of input.
+// returns a message which can go over the network.
 std::string parse_cmdline(std::string buf,std::string nickname) {
-    std::string word,arg,junk;
+    int countdown_n = DEFAULT_COUNTDOWN_N;
+    std::string msg_t,remainder;
     std::istringstream iss(buf);
-    int start_idx;
-    if (buf.find("countdown") == 0) {
-        if (std::getline(iss,junk,' ')) {
-            std::getline(iss,arg,'\n');
-            iss >> start_idx;
-        }
-        else {
-            start_idx = 3;
-        }
-        return countdown_n_msg(start_idx);
-    }
-    else if (buf.find("write") == 0) {
-        if (std::getline(iss,junk,' ')) {
-            std::getline(iss,arg,'\n');
-        }
-        else {
-            throw std::invalid_argument("Invalid syntax");
-        }
-        return write_msg(arg);
-    }
-    else if (buf.find("q") == 0) {
+    iss >> msg_t;
+    // process functions without arguments
+    if (msg_t == "q" || msg_t == "quit" || msg_t == "exit") {
         return goodbye_msg(nickname);
     }
+    else if (msg_t == "countdown") {
+        // if there is no more input to read, then countdown_n goes unchanged from the default.
+        iss >> countdown_n;
+        return countdown_n_msg(countdown_n);
+    }
+    else if (msg_t == "write" || msg_t == "w") {
+        std::getline(iss,remainder);
+        return write_msg(remainder);
+    }
     else {
-        throw std::invalid_argument("Invalid syntax");
+        throw std::invalid_argument("Not in the interactive command line language");
     }
 }
 
@@ -182,8 +179,13 @@ int main (int argc, char **argv) {
         std::cerr << "Could not connect to server" << std::endl;
         return -1;
     }
+    msg = hello_msg(nickname);
+    if (write(srv_socket,msg.c_str(),msg.length()) < 0) {
+        std::cerr << "Failed to write hello message." << std::endl;
+    }
     const int max_fd = srv_socket;
     std::cout << "Connected to " << server << std::endl;
+
     // do a select on STDIN and 
     Color::Modifier red(Color::FG_RED);
     Color::Modifier def(Color::FG_DEFAULT);
@@ -200,9 +202,11 @@ int main (int argc, char **argv) {
                 std::cerr << "Error in select" << std::endl;
                 break;
             default:
+                // this happens asynchronously as soon as typing starts.
                 if (FD_ISSET(STDIN_FILENO,&read_fds)) {
                     msg = lock_msg(nickname);
                     write(srv_socket,msg.c_str(),msg.length());
+                    // this blocks until a whole line of input. will be perceptible in human time (during which a lock occurs).
                     std::getline(std::cin,cmd);
                     try {
                         auto msg = parse_cmdline(cmd,nickname);
