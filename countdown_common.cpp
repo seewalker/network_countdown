@@ -3,6 +3,8 @@
  */
 #include <stdlib.h>
 #include <unistd.h>
+#include <errno.h>
+#include <system_error>
 #include <sys/socket.h>
 #include <arpa/inet.h>
 #include <netinet/in.h>
@@ -13,15 +15,16 @@
 #include "cxxopts.hpp"
 
 enum msg_t {
-    GREETING = 0,
+    HELLO = 0,
+    GOODBYE = 8,
     PEER_LOCK = 1,
     PEER_UNLOCK = 2,
     WRITE_ARBITARY = 3,
     COUNTDOWN_N = 4,
     COUNTDOWN_ORDER = 11,
+    COUNTDOWN_INTERRUPT = 12,
     PING = 6,
     PING_INIT = 7,
-    GOODBYE = 8,
     HELLO_ACK = 9,
     MALFORMED = 10
 };
@@ -44,7 +47,7 @@ const double PING_TIMEOUT = 5;
 msg_t classify(char *buf) {
     std::string msg(buf);
     if (msg.find("hello") == 0) {
-        return GREETING;
+        return HELLO;
     }
     if (msg.find("hello_ack") == 0) {
         return HELLO_ACK;
@@ -66,6 +69,9 @@ msg_t classify(char *buf) {
     }
     else if (msg.find("countdown_order") == 0) {
         return COUNTDOWN_ORDER;
+    }
+    else if (msg.find("countdown_interrupt") == 0) {
+        return COUNTDOWN_INTERRUPT;
     }
     // only the server sends ping_init.
     else if (msg.find("init_ping") == 0) {
@@ -168,16 +174,16 @@ std::string parse_goodbye(std::string cmd) {
     return parse_greeting_common("goodbye",cmd);
 }
 
-// this is currently infinite-looping.
 int recvloop(int fd,char *buf) {
     int buf_ptr = 0,count;
     do {
         if ((count = recv(fd,buf + buf_ptr,MAX_MSGLEN,0)) < 0) {
-
+            perror("recvloop error: ");
+            throw std::system_error(errno,std::generic_category());
         }
         buf_ptr += count;
         if (buf_ptr > MAX_MSGLEN) {
-
+            throw std::length_error(" ");
         }
     } while (buf[buf_ptr-1] != '\n' && buf[buf_ptr] != '\0');
     return buf_ptr;

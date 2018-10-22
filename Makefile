@@ -13,3 +13,6 @@ client: countdown_client.cpp
 server: countdown_server.cpp
 	${CXX} ${CXXFLAGS} countdown_server.cpp -o $@
 all: client server
+
+clean:
+	rm client server

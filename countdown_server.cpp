@@ -204,15 +204,16 @@ int main(int argc, char **argv) {
                         // do the recv into recvbuf
                         msglen = recvloop(client_meta.sock,msgbuf);
                         switch (classify(msgbuf)) {
-                            case GREETING:
+                            case HELLO:
                                 try {
                                     client_meta.nickname = parse_hello(msgbuf);
+                                    broadcast(i,client_metas,msgbuf,msglen);
                                 }
                                 catch (const std::exception& e) {
-
+                                    std::cerr << "Could not extract nickname from hello message, so not passing it along." << std::endl;
+                                    // is this a good place to close the connection?
                                 }
                                 break;
-                                broadcast(i,client_metas,msgbuf,msglen);
                             case GOODBYE:
                                 delete_idxs.push_back(i);
                                 broadcast(i,client_metas,msgbuf,msglen);
@@ -227,11 +228,11 @@ int main(int argc, char **argv) {
                                     else {
                                         lock_owner = lock_nickname;
                                     }
+                                    broadcast(i,client_metas,msgbuf,msglen);
                                 }
                                 catch (const std::exception& e) {
-
+                                    std::cerr << "Could not parse lock message, so not passing it anywhere." << std::endl;
                                 }
-                                broadcast(i,client_metas,msgbuf,msglen);
                                 break;
                             case PEER_UNLOCK:
                                 try {
@@ -260,7 +261,12 @@ int main(int argc, char **argv) {
                                         t0 = now();
                                         write(client_metas[i].sock,msg.c_str(),msg.length());
                                         // I should automate the recv loop for these messages.
-                                        recvloop(client_metas[i].sock,msgbuf);
+                                        try {
+                                            auto ping_ret = recvloop(client_metas[i].sock,msgbuf);
+                                        }
+                                        catch (const std::exception& e ) {
+
+                                        }
                                         tf = now();
                                         try {
                                             seq = parse_ping_msg(msg);
@@ -281,6 +287,16 @@ int main(int argc, char **argv) {
                                 ++n_countdowns;
                                 break;
                             case PING:
+                                std::cerr << "A ping message has been recieved asynchronously, which should not happen." << std::endl;
+                                break;
+                            case COUNTDOWN_INTERRUPT:
+                            case COUNTDOWN_ORDER:
+                            case PING_INIT:
+                            case HELLO_ACK:
+                                std::cerr << "The server should never recieve this message. It should only send it." << std::endl;
+                                break;
+                            case MALFORMED:
+                                std::cerr << "The message was not even recognized on the first pass. Discarding it." << std::endl;
                                 break;
                         }
                     }

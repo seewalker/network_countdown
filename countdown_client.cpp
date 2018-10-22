@@ -65,7 +65,19 @@ int parse_countdown_n_msg(std::string cmd) {
     return parse_unary_int("countdown_n",cmd);
 }
 
+int parse_ping_init_msg(std::string cmd) {
+    int n;
+    std::string msg_t;
+    std::istringstream iss(cmd);
+    iss >> msg_t;
+    if (msg_t != "init_ping") {
+        throw std::domain_error(" ");
+    }
+    iss >> n;
+    return n;
+}
 
+// a countdown order comes from the server and has a rtt-based delay with it.
 void parse_countdown_order_msg(std::string cmd,int &start_idx,double &delay) {
     std::string msg_t;
     std::istringstream iss(cmd);
@@ -113,7 +125,6 @@ void mk_client_fd_sets(int srv_socket,fd_set *read_fds,fd_set *write_fds,fd_set 
     FD_ZERO(read_fds);
     FD_SET(STDIN_FILENO,read_fds);
     FD_SET(srv_socket,read_fds);
-
     // for now these will be unused.
     FD_ZERO(write_fds);
     FD_ZERO(except_fds);
@@ -122,12 +133,12 @@ void mk_client_fd_sets(int srv_socket,fd_set *read_fds,fd_set *write_fds,fd_set 
 int main (int argc, char **argv) {
     // parse command line arguments.
     std::string nickname,server,cmd,write_buffer,srv_buffer,msg,t_sent,peer_name,cmdline;
-    int port,srv_socket,count,msglen,ping_init_n=-1,countdown_start;
+    int port,srv_socket,count,msglen,ping_n=-1,countdown_start,i,seq,msglen_synch;
     double countdown_delay;
     std::vector<std::string> peer_names;
     struct sockaddr_in srv_addr;
     fd_set read_fds,write_fds,except_fds;
-    char srv_readbuf[MAX_MSGLEN];
+    char srv_readbuf[MAX_MSGLEN],msgbuf_synch[MAX_MSGLEN];
     int srv_readbuf_ptr = 0;
     bool peer_writing = false;
 
@@ -167,6 +178,8 @@ int main (int argc, char **argv) {
     // do a select on STDIN and 
     Color::Modifier red(Color::FG_RED);
     Color::Modifier def(Color::FG_DEFAULT);
+
+    // in the cryptographic case, use BIO_set_conn_ip
     while (true) {
         mk_client_fd_sets(srv_socket,&read_fds,&write_fds,&except_fds);
         int ret = select(max_fd + 1,&read_fds,&write_fds,&except_fds,NULL);
@@ -196,7 +209,7 @@ int main (int argc, char **argv) {
                 if (FD_ISSET(srv_socket,&read_fds)) {
 					recvloop(srv_socket,srv_readbuf);
 					switch (classify(srv_readbuf)) {
-						case GREETING:
+						case HELLO:
 							try {
 								peer_name = parse_hello(srv_readbuf);
 								std::cout << peer_name << " joined at " << now() << " on this clock and " << t_sent << " on theirs" << std::endl;
@@ -215,9 +228,43 @@ int main (int argc, char **argv) {
 							}
 							break;
 						case PING_INIT:
+                            try {
+                                ping_n = parse_ping_init_msg(srv_readbuf);
+                            }
+                            catch (const std::exception& e ) {
+
+                            }
 							break;
 						case PING: //this should only happen asynchronously for the first ping message, others are synchronous..
+                            // very nice, ready to do implement client ping.
+                            if (ping_n < 1) {
+                                std::cerr << " " << std::endl;
+                            }
+                            try {
+                                seq = parse_ping_msg(srv_readbuf);
+                                if (seq != 0) {
 
+                                }
+                            }
+                            catch (const std::exception& e ) {
+
+                            }
+                            // we already have the first ping message in the buffer.
+                            for(i=1;i<ping_n;++i) {
+                                try {
+                                    msglen_synch = recvloop(srv_socket,msgbuf_synch);
+                                    seq = parse_ping_msg(msgbuf_synch);
+                                    if (seq == i) { //echo it back.
+                                        write(srv_socket,msgbuf_synch,msglen_synch);
+                                    }
+                                    else {
+                                        std::cerr << " " << std::endl;
+                                    }
+                                }
+                                catch (const std::exception& e ) {
+
+                                }
+                            }
 							break;
 						case PEER_LOCK:
 							std::cout << red;
