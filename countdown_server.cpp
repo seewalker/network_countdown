@@ -143,7 +143,7 @@ int main(int argc, char **argv) {
     std::experimental::optional<std::string> lock_owner = std::experimental::nullopt;
     std::string msg,t_sent;
     std::time_t t0,tf;
-    char msgbuf[MAX_MSGLEN],msgbuf_synch[MAX_MSGLEN];
+    char msgbuf[MAX_MSGLEN],msgbuf_synch[MAX_MSGLEN],msgwritebuf_synch[MAX_MSGLEN];
     fd_set read_fds,write_fds,except_fds;
     cxxopts::Options options("Countdown Client","A program that will coordinate a countdown.");
     // Tne number of pings applies both to the before and after of a countdown (the first one, to get up-to-date estimates on latencies. the latter to see how close it was to a successful countdown.).
@@ -270,12 +270,13 @@ int main(int argc, char **argv) {
                             case COUNTDOWN_N:
                                 // do the synchronous ping loops.
                                 for(i=0;i<ping_n;++i) {
-                                    strcpy(msgbuf_synch,ping_msg(i).c_str());
-                                    msglen_synch = strlen(msgbuf_synch);
+                                    // store this once as a c-string ready to write.
+                                    strcpy(msgwritebuf_synch,ping_msg(i).c_str());
+                                    msglen_synch = strlen(msgwritebuf_synch);
                                     for(j=0;j<client_metas.size();++j) {
                                         t0 = now();
                                         // this line is misbehaving somehow, i think.
-                                        write(client_metas[i].sock,msgbuf_synch,msglen_synch);
+                                        write(client_metas[i].sock,msgwritebuf_synch,msglen_synch);
                                         try {
                                             recvloop(client_metas[i].sock,msgbuf_synch); // will throw if needs to.
                                             tf = now();

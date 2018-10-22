@@ -224,6 +224,7 @@ int main (int argc, char **argv) {
                     write(srv_socket,msg.c_str(),msg.length());
                 }
                 if (FD_ISSET(srv_socket,&read_fds)) {
+                    // okay i have confirmed.
 					recvloop(srv_socket,srv_readbuf);
                     try {
                         auto verified = validate_wrap(srv_readbuf);
