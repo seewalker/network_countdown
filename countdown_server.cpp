@@ -54,7 +54,7 @@ int init_socket(int &sock,int port) {
     }
     memset(&addr,0,sizeof(addr));
     addr.sin_family = AF_INET;
-    addr.sin_addr.s_addr = inet_addr(EXTERNAL_IPV4);
+    addr.sin_addr.s_addr = inet_addr(DEFAULT_SERVER);
     addr.sin_port = htons(port);
     if (bind(sock,(struct sockaddr*)&addr, sizeof(struct sockaddr)) != 0) {
         std::cerr << " " << std::endl;
@@ -212,6 +212,7 @@ int main(int argc, char **argv) {
                             case HELLO:
                                 try {
                                     client_meta.nickname = parse_hello(msgbuf);
+                                    std::cout << "Got hello message from " << client_meta.nickname << std::endl;
                                     broadcast(i,client_metas,msgbuf,msglen);
                                 }
                                 catch (const std::exception& e) {
