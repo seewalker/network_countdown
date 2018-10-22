@@ -40,7 +40,6 @@ std::string format_say_raw(std::string saying) {
     return oss.str();
 }
 
-
 std::string lock_common_msg(std::string msg_t, std::string nickname) {
    std::ostringstream oss;
    auto t = now();

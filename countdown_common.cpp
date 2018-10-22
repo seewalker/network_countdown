@@ -11,7 +11,6 @@
 #include <sys/select.h>
 #include <vector>
 #include <iostream>
-#include <string>
 #include <chrono>
 #include "cxxopts.hpp"
 
@@ -51,10 +50,10 @@ msg_t classify(const char *buf) {
     if (msg.find("goodbye") == 0) {
         return GOODBYE;
     }
-    if (msg == "lock") {
+    if (msg.find("lock") == 0) {
         return PEER_LOCK;
     }
-    if (msg == "unlock") {
+    if (msg.find("unlock") == 0) {
         return PEER_UNLOCK;
     }
     if (msg.find("write") == 0) {
