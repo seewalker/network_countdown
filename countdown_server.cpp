@@ -112,9 +112,25 @@ std::string countdown_order_msg(int start_idx,double delay) {
     return validate_wrap(oss.str());
 }
 
+std::string shutdown_msg( ) {
+    std::ostringstream oss;
+    oss << "shutdown" << std::endl;
+    return validate_wrap(oss.str());
+}
+
+// this should take an optional string, since the owner of the lock may not be known.
+std::string unlock_msg(std::experimental::optional<std::string> nickname) {
+    if (nickname == std::experimental::nullopt) {
+        return lock_common_msg("unlock","");
+    }
+    else {
+        return lock_common_msg("unlock",*nickname);
+    }
+}
+
 // to broacast to literally everyone, use a negative mask.
 // to relay to everyone but original sender, use mask with relevant fd.
-int broadcast(int mask,std::vector<struct client_meta> client_metas,char *msgbuf, int msglen) {
+int broadcast(int mask,std::vector<struct client_meta> client_metas,const char *msgbuf, int msglen) {
     int n_fail = 0;
     int j;
     for(j=0;j<client_metas.size();++j) {
@@ -137,11 +153,13 @@ std::vector<int> client_socks(std::vector<struct client_meta> metas) {
     return socks;
 }
 
+// server decides on unlock after countdown or write has occured.
+// when should a shutdown occur?
 int main(int argc, char **argv) {
     int listen_sock,port,hi_sock,ret,client_sock,ping_n,n_countdowns=0,i,j,msglen,msglen_synch,seq;
     std::vector<client_meta> client_metas;
     std::experimental::optional<std::string> lock_owner = std::experimental::nullopt;
-    std::string msg,t_sent;
+    std::string msg,t_sent,unlock_msgbuf;
     std::time_t t0,tf;
     char msgbuf[MAX_MSGLEN],msgbuf_synch[MAX_MSGLEN],msgwritebuf_synch[MAX_MSGLEN];
     fd_set read_fds,write_fds,except_fds;
@@ -270,8 +288,12 @@ int main(int argc, char **argv) {
                                 if (broadcast(i,client_metas,msgbuf,msglen) > 0) {
                                     
                                 }
+                                // send unlock.
+                                unlock_msgbuf = unlock_msg(lock_owner);
+                                if (broadcast(-1,client_metas,unlock_msgbuf.c_str(),unlock_msgbuf.length())) {
+
+                                }
                                 break;
-                            // will unlock messages disrupt here?
                             case COUNTDOWN_N:
                                 // do the synchronous ping loops.
                                 std::cout << "Got countdown message from " << client_meta.nickname << std::endl;
@@ -284,6 +306,7 @@ int main(int argc, char **argv) {
                                         // this line is misbehaving somehow, i think.
                                         write(client_metas[i].sock,msgwritebuf_synch,msglen_synch);
                                         try {
+                                            // this got a unlock message.
                                             recvloop(client_metas[i].sock,msgbuf_synch); // will throw if needs to.
                                             tf = now();
                                             seq = parse_ping_msg(msgbuf_synch);
@@ -304,6 +327,11 @@ int main(int argc, char **argv) {
                                 if (broadcast(-1,client_metas,msgbuf,msglen) > 0) {
                                     std::cerr << "Countdown failed to broadcast perfectly." << std::endl;
                                 }
+                                // send unlock message.
+                                unlock_msgbuf = unlock_msg(lock_owner);
+                                if (broadcast(-1,client_metas,unlock_msgbuf.c_str(),unlock_msgbuf.length())) {
+
+                                }
                                 ++n_countdowns;
                                 break;
                             case PING:
@@ -312,6 +340,7 @@ int main(int argc, char **argv) {
                             case COUNTDOWN_INTERRUPT:
                             case COUNTDOWN_ORDER:
                             case PING_INIT:
+                            case SHUTDOWN:
                             case HELLO_ACK:
                                 std::cerr << "The server should never recieve this message. It should only send it." << std::endl;
                                 break;

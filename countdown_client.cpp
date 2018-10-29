@@ -40,22 +40,11 @@ std::string format_say_raw(std::string saying) {
     return oss.str();
 }
 
-std::string lock_common_msg(std::string msg_t, std::string nickname) {
-   std::ostringstream oss;
-   auto t = now();
-   char *t_repr = std::ctime(&t);
-   // remove trailing newline.
-   t_repr[strlen(t_repr)-1] = '\0';
-   oss << msg_t << " " << nickname << " " << "(" << t_repr << ")" << std::endl;
-   return validate_wrap(oss.str());
-}
+
 std::string lock_msg(std::string nickname) {
     return lock_common_msg("lock",nickname);
 }
 
-std::string unlock_msg(std::string nickname) {
-    return lock_common_msg("unlock",nickname);
-}
 
 std::string countdown_n_msg(int start_idx) {
     std::ostringstream oss;
@@ -220,8 +209,7 @@ int main (int argc, char **argv) {
                     catch (const std::exception& e) {
                         break;
                     }
-                    msg = unlock_msg(nickname);
-                    write(srv_socket,msg.c_str(),msg.length());
+                    // used to be that the unlock message would be sent here, but that should be done after
                 }
                 if (FD_ISSET(srv_socket,&read_fds)) {
                     // okay i have confirmed.
@@ -233,6 +221,9 @@ int main (int argc, char **argv) {
                         std::cerr << "Warning: the incoming message does not pass checks." << std::endl;
                     }
                     switch (classify(srv_readbuf)) {
+                        case SHUTDOWN:
+                            std::cout << "Server send shutdown message." << std::endl;
+                            return 0;
                         case HELLO:
                             try {
                                 peer_name = parse_hello(srv_readbuf);
