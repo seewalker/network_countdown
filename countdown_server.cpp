@@ -91,6 +91,9 @@ int process_connection(int listen_sock,struct sockaddr_in *addr) {
 void mk_server_fd_sets(int listen_socket,std::vector<int> client_sockets,fd_set *read_fds,fd_set *write_fds,fd_set *except_fds) {
     FD_ZERO(read_fds);
     FD_SET(listen_socket,read_fds);
+    // lisen for interactive command line.
+    FD_SET(STDIN_FILENO,read_fds);
+    // listen for each connection.
     for (auto s : client_sockets) {
         FD_SET(s,read_fds);
     }
