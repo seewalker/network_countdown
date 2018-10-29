@@ -337,14 +337,14 @@ int main(int argc, char **argv) {
                                     for(j=0;j<client_metas.size();++j) {
                                         t0 = now();
                                         // this line is misbehaving somehow, i think.
-                                        write(client_metas[i].sock,msgwritebuf_synch,msglen_synch);
+                                        write(client_metas[j].sock,msgwritebuf_synch,msglen_synch);
                                         try {
                                             // this got a unlock message.
-                                            recvloop(client_metas[i].sock,msgbuf_synch); // will throw if needs to.
+                                            recvloop(client_metas[j].sock,msgbuf_synch); // will throw if needs to.
                                             tf = now();
                                             seq = parse_ping_msg(msgbuf_synch);
                                             if (seq == i) {
-                                                client_metas[i].rtts.push_back(tf-t0);
+                                                client_metas[j].rtts.push_back(tf-t0);
                                             }
                                             else {
                                                 std::cerr << "Recieved out of order sequence number from client" << std::endl;
