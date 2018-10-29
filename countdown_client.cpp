@@ -205,6 +205,10 @@ int main (int argc, char **argv) {
                         auto msg = parse_cmdline(cmd,nickname);
                         // this is either a countdown or write or goodbye message.
                         write(srv_socket,msg.c_str(),msg.length());
+                        if (classify(msg.c_str()) == GOODBYE) {
+                            std::cout << "Sent goodbye message, exiting." << std::endl;
+                            return 0;
+                        }
                     }
                     catch (const std::exception& e) {
                         break;
