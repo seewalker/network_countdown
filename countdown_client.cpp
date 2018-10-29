@@ -226,7 +226,7 @@ int main (int argc, char **argv) {
                     }
                     switch (classify(srv_readbuf)) {
                         case SHUTDOWN:
-                            std::cout << "Server send shutdown message." << std::endl;
+                            std::cout << "Server sent shutdown message." << std::endl;
                             return 0;
                         case HELLO:
                             try {

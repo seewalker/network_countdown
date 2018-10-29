@@ -153,13 +153,25 @@ std::vector<int> client_socks(std::vector<struct client_meta> metas) {
     return socks;
 }
 
+std::string parse_cmdline(std::string cmd) {
+    std::string msg_t;
+    std::istringstream iss(cmd);
+    iss >> msg_t;
+    if (msg_t == "q" || msg_t == "quit" || msg_t == "exit") {
+        return shutdown_msg( );
+    }
+    else {
+        throw std::invalid_argument("Not in the interactive command line language");
+    }
+}
+
 // server decides on unlock after countdown or write has occured.
 // when should a shutdown occur?
 int main(int argc, char **argv) {
     int listen_sock,port,hi_sock,ret,client_sock,ping_n,n_countdowns=0,i,j,msglen,msglen_synch,seq;
     std::vector<client_meta> client_metas;
     std::experimental::optional<std::string> lock_owner = std::experimental::nullopt;
-    std::string msg,t_sent,unlock_msgbuf;
+    std::string msg,t_sent,unlock_msgbuf,cmd;
     std::time_t t0,tf;
     char msgbuf[MAX_MSGLEN],msgbuf_synch[MAX_MSGLEN],msgwritebuf_synch[MAX_MSGLEN];
     fd_set read_fds,write_fds,except_fds;
@@ -217,6 +229,24 @@ int main(int argc, char **argv) {
                     // establish the number of pings.
                     msg = ping_init_msg(ping_n);
                     write(client_sock,msg.c_str(),msg.length());
+                }
+                // server can do a shutdown on stdin.
+                if (FD_ISSET(STDIN_FILENO,&read_fds)) {
+                    try {
+                        std::getline(std::cin,cmd);
+                        auto msg = parse_cmdline(cmd);
+                        broadcast(-1,client_metas,msg.c_str(),msg.length());
+                        switch(classify(msg.c_str())) {
+                            case SHUTDOWN:
+                                std::cout << "Shutting down." << std::endl;
+                                return 0;
+                            default:
+                                break;
+                        }
+                    }
+                    catch (const std::exception& e) {
+
+                    }
                 }
                 std::vector<int> delete_idxs;
                 for (i=0;i<client_metas.size(); ++i) {
