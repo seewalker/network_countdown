@@ -52,22 +52,14 @@ std::string countdown_n_msg(int start_idx) {
     return validate_wrap(oss.str());
 }
 
-int parse_countdown_n_msg(std::string cmd) {
-    return parse_unary_int("countdown_n",cmd);
-}
-
 int parse_ping_init_msg(std::string cmd) {
-    int n;
+    int n=-1;
     std::string msg_t;
     std::istringstream iss(cmd);
     iss >> msg_t;
-    if (msg_t != "init_ping") {
-        throw std::domain_error(" ");
-    }
+    if (msg_t != "init_ping") { throw std::domain_error("Message type is not what is expected."); }
     iss >> n;
-    if (n < 1) {
-        throw std::domain_error(" ");
-    }
+    if (n < 1) { throw std::domain_error("Invalid value for ping n"); }
     return n;
 }
 
@@ -76,9 +68,7 @@ void parse_countdown_order_msg(std::string cmd,int &start_idx,double &delay) {
     std::string msg_t;
     std::istringstream iss(cmd);
     iss >> msg_t;
-    if (msg_t != "countdown_order") {
-        throw std::domain_error(" ");
-    }
+    if (msg_t != "countdown_order") { throw std::domain_error("Message type is not what is expected"); }
     iss >> start_idx;
     iss >> delay;
 }
@@ -104,9 +94,7 @@ std::string parse_cmdline(std::string buf,std::string nickname) {
         std::getline(iss,remainder);
         return write_msg(remainder);
     }
-    else {
-        throw std::invalid_argument("Not in the interactive command line language");
-    }
+    else { throw std::invalid_argument("Not in the interactive command line language"); }
 }
 
 void mk_client_fd_sets(int srv_socket,fd_set *read_fds,fd_set *write_fds,fd_set *except_fds) {
@@ -174,11 +162,13 @@ int main (int argc, char **argv) {
     }
     msg = hello_msg(nickname);
     if (write(srv_socket,msg.c_str(),msg.length()) < 0) {
-        std::cerr << "Failed to write hello message." << std::endl;
+        auto goodbyemsg =  goodbye_msg(nickname);
+        write(srv_socket,goodbyemsg.c_str(),goodbyemsg.length());
+        std::cerr << "Failed to write hello message. Sending out goodbye message and exiting." << std::endl;
+        return -1;
     }
     const int max_fd = srv_socket;
     std::cout << "Connected to " << server << std::endl;
-
     // do a select on STDIN and 
     Color::Modifier red(Color::FG_RED);
     Color::Modifier def(Color::FG_DEFAULT);
@@ -221,9 +211,7 @@ int main (int argc, char **argv) {
                     try {
                         auto verified = validate_wrap(srv_readbuf);
                     }
-                    catch (const std::exception& e) {
-                        std::cerr << "Warning: the incoming message does not pass checks." << std::endl;
-                    }
+                    catch (const std::exception& e) { std::cerr << "Warning: the incoming message does not pass checks." << std::endl; }
                     switch (classify(srv_readbuf)) {
                         case SHUTDOWN:
                             std::cout << "Server sent shutdown message." << std::endl;
@@ -234,54 +222,45 @@ int main (int argc, char **argv) {
                                 std::cout << peer_name << " joined at " << now() << " on this clock and " << t_sent << " on theirs" << std::endl;
                                 peer_names.push_back(peer_name);
                             }
-                            catch(const std::exception& e) {
-                                std::cerr << "Don't know who joined" << std::endl;
-                            }
+                            catch(const std::exception& e) { std::cerr << "Don't know who joined" << std::endl; }
                             break;
                         case GOODBYE:
                             peer_name = parse_goodbye(srv_readbuf);
                             peer_names.erase(std::remove(peer_names.begin(),peer_names.end(),peer_name),peer_names.end());
                             std::cout << peer_name << " exited" << std::endl;
-                            if (peer_names.size() == 0) {
-                                std::cout << "You are the last one here" << std::endl;
-                            }
+                            if (peer_names.size() == 0) { std::cout << "You are the last one here" << std::endl; }
                             break;
                         case PING_INIT:
                             try {
                                 ping_n = parse_ping_init_msg(srv_readbuf);
                                 if (chatty) { std::cout << "Set ping_n =" << ping_n << std::endl; }
                             }
-                            catch (const std::exception& e ) {
-
-                            }
+                            catch (const std::exception& e ) { std::cerr << "Could not parse ping_init : " << e.what() << std::endl; }
                             break;
                         case PING: //this should only happen asynchronously for the first ping message, others are synchronous..
                             // very nice, ready to do implement client ping.
                             try {
                                 seq = parse_ping_msg(srv_readbuf);
                                 if (seq != 0) {
-
+                                    std::cerr << "Recieved an initial ping message with a non-zero sequence number." << std::endl;
                                 }
                                 // reply back to the first ping.
                                 write(srv_socket,srv_readbuf,strlen(srv_readbuf));
                             }
                             catch (const std::exception& e ) {
-
+                                std::cerr << "ping exception : " << e.what() << std::endl;
                             }
                             // we already have the first ping message in the buffer.
                             for(i=1;i<ping_n;++i) {
                                 try {
                                     msglen_synch = recvloop(srv_socket,msgbuf_synch);
                                     seq = parse_ping_msg(msgbuf_synch);
-                                    if (seq == i) { //echo it back.
-                                        write(srv_socket,msgbuf_synch,msglen_synch);
-                                    }
-                                    else {
-                                        std::cerr << " " << std::endl;
-                                    }
+                                    //echo it back.
+                                    if (seq == i) { write(srv_socket,msgbuf_synch,msglen_synch); }
+                                    else { std::cerr << " " << std::endl; }
                                 }
                                 catch (const std::exception& e ) {
-
+                                    std::cerr << "ping error" << std::endl;
                                 }
                             }
                             break;
@@ -297,7 +276,7 @@ int main (int argc, char **argv) {
                                 std::system(cmdline.c_str());
                             }
                             catch(const std::exception& e) {
-
+                                std::cerr << "problem handling write msg" << std::endl;
                             }
                             break;
                         case COUNTDOWN_ORDER:
@@ -307,7 +286,7 @@ int main (int argc, char **argv) {
                                 std::system(cmdline.c_str());
                             }
                             catch(const std::exception& e) {
-
+                                std::cerr << "problem handling countdown order" << std::endl;
                             }
                             break;
                         case MALFORMED:
@@ -315,6 +294,7 @@ int main (int argc, char **argv) {
                             break;
                         default:
                             std::cerr << "Should never happen, the classify function needs to be debugged" << std::endl;
+                            break;
                     }
                 }
             }

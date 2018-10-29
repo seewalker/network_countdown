@@ -171,13 +171,14 @@ std::string parse_cmdline(std::string cmd) {
 // server decides on unlock after countdown or write has occured.
 // when should a shutdown occur?
 int main(int argc, char **argv) {
-    int listen_sock,port,hi_sock,ret,client_sock,ping_n,n_countdowns=0,i,j,msglen,msglen_synch,seq;
+    int listen_sock,port,hi_sock,ret,client_sock,ping_n,n_countdowns=0,i,j,msglen,msglen_synch,seq,n;
     std::vector<client_meta> client_metas;
     std::experimental::optional<std::string> lock_owner = std::experimental::nullopt;
     std::string msg,t_sent,unlock_msgbuf,cmd;
     std::time_t t0,tf;
     char msgbuf[MAX_MSGLEN],msgbuf_synch[MAX_MSGLEN],msgwritebuf_synch[MAX_MSGLEN];
     fd_set read_fds,write_fds,except_fds;
+    double t_delay;
     cxxopts::Options options("Countdown Client","A program that will coordinate a countdown.");
     // Tne number of pings applies both to the before and after of a countdown (the first one, to get up-to-date estimates on latencies. the latter to see how close it was to a successful countdown.).
     options.add_options()
@@ -204,13 +205,7 @@ int main(int argc, char **argv) {
     while (true) {
         auto cs = client_socks(client_metas);
         mk_server_fd_sets(listen_sock,cs,&read_fds,&write_fds,&except_fds);
-        if (client_metas.size() == 0) {
-            hi_sock = listen_sock;
-        }
-        else {
-            auto argmax = std::max_element(cs.begin(),cs.end());
-            hi_sock = *argmax;
-        }
+        hi_sock = (client_metas.size() == 0) ? listen_sock : *std::max_element(cs.begin(),cs.end());
         ret = select(hi_sock + 1,&read_fds,&write_fds,&except_fds,NULL);
         switch (ret) {
             case -1:
@@ -226,9 +221,7 @@ int main(int argc, char **argv) {
                         meta.sock = client_sock;
                         client_metas.push_back(meta);
                     }
-                    else {
-                        std::cerr << "Failed to accept incoming connection" << std::endl;
-                    }
+                    else { std::cerr << "Failed to accept incoming connection" << std::endl; }
                     // establish the number of pings.
                     msg = ping_init_msg(ping_n);
                     write(client_sock,msg.c_str(),msg.length());
@@ -266,10 +259,7 @@ int main(int argc, char **argv) {
                                         std::cerr << "" << std::endl;
                                     }
                                 }
-                                catch (const std::exception& e) {
-                                    std::cerr << "Could not extract nickname from hello message, so not passing it along." << std::endl;
-                                    // is this a good place to close the connection?
-                                }
+                                catch (const std::exception& e) { std::cerr << "Could not extract nickname from hello message, so not passing it along." << std::endl; }
                                 break;
                             case GOODBYE:
                                 std::cout << "Got goodbye message from " << client_meta.nickname << std::endl;
@@ -283,12 +273,8 @@ int main(int argc, char **argv) {
                                     std::string lock_nickname,lock_date;
                                     lock_nickname = parse_lock_msg(msgbuf,lock_date);
                                     std::cout << "Got lock message from " << client_meta.nickname << std::endl;
-                                    if (lock_owner != std::experimental::nullopt) {
-                                        std::cerr << "Warning, multiple people typing command at once" << std::endl;
-                                    }
-                                    else {
-                                        lock_owner = lock_nickname;
-                                    }
+                                    if (lock_owner != std::experimental::nullopt) { std::cerr << "Warning, multiple people typing command at once" << std::endl; }
+                                    else { lock_owner = lock_nickname; }
                                     if (broadcast(i,client_metas,msgbuf,msglen) > 0) {
                                         
                                     }
@@ -302,12 +288,8 @@ int main(int argc, char **argv) {
                                     std::string lock_nickname,lock_date;
                                     lock_nickname = parse_unlock_msg(msgbuf,lock_date);
                                     std::cout << "Got unlock message from " << client_meta.nickname << std::endl;
-                                    if (lock_owner != lock_nickname) {
-                                        std::cerr << "Warning, got unlock message from someone other than current lock owner." << std::endl;
-                                    }
-                                    else {
-                                        lock_owner = std::experimental::nullopt;
-                                    }
+                                    if (lock_owner != lock_nickname) { std::cerr << "Warning, got unlock message from someone other than current lock owner." << std::endl; }
+                                    else { lock_owner = std::experimental::nullopt; }
                                     if (broadcast(i,client_metas,msgbuf,msglen) > 0) {
                                        
                                     }
@@ -329,7 +311,15 @@ int main(int argc, char **argv) {
                                 break;
                             case COUNTDOWN_N:
                                 // do the synchronous ping loops.
-                                std::cout << "Got countdown message from " << client_meta.nickname << std::endl;
+                                try {
+                                    std::string countdown_msg(msgbuf);
+                                    n = parse_countdown_n_msg(countdown_msg);
+                                    std::cout << "Got countdown message from " << client_meta.nickname << std::endl;
+                                }
+                                catch (std::exception e) {
+                                    std::cerr << e.what() << std::endl << "So exiting the countdown." << std::endl;
+                                    break;
+                                }
                                 for(i=0;i<ping_n;++i) {
                                     // store this once as a c-string ready to write.
                                     strcpy(msgwritebuf_synch,ping_msg(i).c_str());
@@ -343,22 +333,18 @@ int main(int argc, char **argv) {
                                             recvloop(client_metas[j].sock,msgbuf_synch); // will throw if needs to.
                                             tf = now();
                                             seq = parse_ping_msg(msgbuf_synch);
-                                            if (seq == i) {
-                                                client_metas[j].rtts.push_back(tf-t0);
-                                            }
-                                            else {
-                                                std::cerr << "Recieved out of order sequence number from client" << std::endl;
-                                            }
+                                            if (seq == i) { client_metas[j].rtts.push_back(tf-t0); }
+                                            else { std::cerr << "Recieved out of order sequence number from client" << std::endl; }
                                         }
                                         // make the exceptions distinct for the recvloop and the parse_ping_msg.
-                                        catch (const std::exception& e ) {
-                                            std::cerr << "ping loop error: " << e.what() << std::endl;
-                                        }
+                                        catch (const std::exception& e ) { std::cerr << "ping loop error: " << e.what() << std::endl; }
                                     }
                                 }
-                                // -1 means send even to the originating client.
-                                if (broadcast(-1,client_metas,msgbuf,msglen) > 0) {
-                                    std::cerr << "Countdown failed to broadcast perfectly." << std::endl;
+                                // sending countdown orders is not as simple as a broadcast because each must have its own delay and custom message.
+                                for(j=0;j<client_metas.size();++j) {
+                                    t_delay = client_metas[j].estimate_send_t();
+                                    auto ordermsg = countdown_order_msg(n,t_delay);
+                                    write(client_metas[j].sock,ordermsg.c_str(),ordermsg.length());
                                 }
                                 // send unlock message.
                                 unlock_msgbuf = unlock_msg(lock_owner);
