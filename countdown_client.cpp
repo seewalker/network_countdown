@@ -225,33 +225,33 @@ int main (int argc, char **argv) {
                 }
                 if (FD_ISSET(srv_socket,&read_fds)) {
                     // okay i have confirmed.
-					recvloop(srv_socket,srv_readbuf);
+                    recvloop(srv_socket,srv_readbuf);
                     try {
                         auto verified = validate_wrap(srv_readbuf);
                     }
                     catch (const std::exception& e) {
                         std::cerr << "Warning: the incoming message does not pass checks." << std::endl;
                     }
-					switch (classify(srv_readbuf)) {
-						case HELLO:
-							try {
-								peer_name = parse_hello(srv_readbuf);
-								std::cout << peer_name << " joined at " << now() << " on this clock and " << t_sent << " on theirs" << std::endl;
-								peer_names.push_back(peer_name);
-							}
-							catch(const std::exception& e) {
-								std::cerr << "Don't know who joined" << std::endl;
-							}
-							break;
-						case GOODBYE:
-							peer_name = parse_goodbye(srv_readbuf);
-							peer_names.erase(std::remove(peer_names.begin(),peer_names.end(),peer_name),peer_names.end());
-							std::cout << peer_name << " exited" << std::endl;
-							if (peer_names.size() == 0) {
-								std::cout << "You are the last one here" << std::endl;
-							}
-							break;
-						case PING_INIT:
+                    switch (classify(srv_readbuf)) {
+                        case HELLO:
+                            try {
+                                peer_name = parse_hello(srv_readbuf);
+                                std::cout << peer_name << " joined at " << now() << " on this clock and " << t_sent << " on theirs" << std::endl;
+                                peer_names.push_back(peer_name);
+                            }
+                            catch(const std::exception& e) {
+                                std::cerr << "Don't know who joined" << std::endl;
+                            }
+                            break;
+                        case GOODBYE:
+                            peer_name = parse_goodbye(srv_readbuf);
+                            peer_names.erase(std::remove(peer_names.begin(),peer_names.end(),peer_name),peer_names.end());
+                            std::cout << peer_name << " exited" << std::endl;
+                            if (peer_names.size() == 0) {
+                                std::cout << "You are the last one here" << std::endl;
+                            }
+                            break;
+                        case PING_INIT:
                             try {
                                 ping_n = parse_ping_init_msg(srv_readbuf);
                                 if (chatty) { std::cout << "Set ping_n =" << ping_n << std::endl; }
@@ -259,8 +259,8 @@ int main (int argc, char **argv) {
                             catch (const std::exception& e ) {
 
                             }
-							break;
-						case PING: //this should only happen asynchronously for the first ping message, others are synchronous..
+                            break;
+                        case PING: //this should only happen asynchronously for the first ping message, others are synchronous..
                             // very nice, ready to do implement client ping.
                             try {
                                 seq = parse_ping_msg(srv_readbuf);
@@ -289,39 +289,39 @@ int main (int argc, char **argv) {
 
                                 }
                             }
-							break;
-						case PEER_LOCK:
-							std::cout << red;
-							break;
-						case PEER_UNLOCK:
-							std::cout << def;
-							break;
-						case WRITE_ARBITARY:
-							try {
-								cmdline = format_say_raw(parse_write_msg(srv_readbuf));
-								std::system(cmdline.c_str());
-							}
-							catch(const std::exception& e) {
+                            break;
+                        case PEER_LOCK:
+                            std::cout << red;
+                            break;
+                        case PEER_UNLOCK:
+                            std::cout << def;
+                            break;
+                        case WRITE_ARBITARY:
+                            try {
+                                cmdline = format_say_raw(parse_write_msg(srv_readbuf));
+                                std::system(cmdline.c_str());
+                            }
+                            catch(const std::exception& e) {
 
-							}
-							break;
-						case COUNTDOWN_ORDER:
-							try {
+                            }
+                            break;
+                        case COUNTDOWN_ORDER:
+                            try {
                                 parse_countdown_order_msg(srv_readbuf,countdown_start,countdown_delay);
-								cmdline = format_say_countdown(countdown_start,countdown_delay);
-								std::system(cmdline.c_str());
-							}
-							catch(const std::exception& e) {
+                                cmdline = format_say_countdown(countdown_start,countdown_delay);
+                                std::system(cmdline.c_str());
+                            }
+                            catch(const std::exception& e) {
 
-							}
-							break;
-						case MALFORMED:
-							std::cerr << "Recieved malformed message: " << srv_readbuf << std::endl;
-							break;
-						default:
-							std::cerr << "Should never happen, the classify function needs to be debugged" << std::endl;
-					}
-				}
-			}
-	}
+                            }
+                            break;
+                        case MALFORMED:
+                            std::cerr << "Recieved malformed message: " << srv_readbuf << std::endl;
+                            break;
+                        default:
+                            std::cerr << "Should never happen, the classify function needs to be debugged" << std::endl;
+                    }
+                }
+            }
+    }
 }

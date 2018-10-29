@@ -76,7 +76,7 @@ char* repr_addr(struct sockaddr_in addr) {
 int process_connection(int listen_sock,struct sockaddr_in *addr) {
     char *client_ipv4;
     int sock;
-	socklen_t client_len;
+    socklen_t client_len;
     client_len = sizeof(addr);
     memset(addr,0,client_len);
     if ((sock = accept(listen_sock,(struct sockaddr *)addr,&client_len)) < 0) {
@@ -221,6 +221,7 @@ int main(int argc, char **argv) {
                                 }
                                 break;
                             case GOODBYE:
+                                std::cout << "Got goodbye message from " << client_meta.nickname << std::endl;
                                 delete_idxs.push_back(i);
                                 if (broadcast(i,client_metas,msgbuf,msglen) > 0) {
                                     
@@ -230,6 +231,7 @@ int main(int argc, char **argv) {
                                 try {
                                     std::string lock_nickname,lock_date;
                                     lock_nickname = parse_lock_msg(msgbuf,lock_date);
+                                    std::cout << "Got lock message from " << client_meta.nickname << std::endl;
                                     if (lock_owner != std::experimental::nullopt) {
                                         std::cerr << "Warning, multiple people typing command at once" << std::endl;
                                     }
@@ -248,6 +250,7 @@ int main(int argc, char **argv) {
                                 try {
                                     std::string lock_nickname,lock_date;
                                     lock_nickname = parse_unlock_msg(msgbuf,lock_date);
+                                    std::cout << "Got unlock message from " << client_meta.nickname << std::endl;
                                     if (lock_owner != lock_nickname) {
                                         std::cerr << "Warning, got unlock message from someone other than current lock owner." << std::endl;
                                     }
@@ -263,12 +266,14 @@ int main(int argc, char **argv) {
                                 }
                                 break;
                             case WRITE_ARBITARY:
+                                std::cout << "Got write message from " << client_meta.nickname << std::endl;
                                 if (broadcast(i,client_metas,msgbuf,msglen) > 0) {
                                     
                                 }
                                 break;
                             case COUNTDOWN_N:
                                 // do the synchronous ping loops.
+                                std::cout << "Got countdown message from " << client_meta.nickname << std::endl;
                                 for(i=0;i<ping_n;++i) {
                                     // store this once as a c-string ready to write.
                                     strcpy(msgwritebuf_synch,ping_msg(i).c_str());
