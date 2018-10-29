@@ -271,6 +271,7 @@ int main(int argc, char **argv) {
                                     
                                 }
                                 break;
+                            // will unlock messages disrupt here?
                             case COUNTDOWN_N:
                                 // do the synchronous ping loops.
                                 std::cout << "Got countdown message from " << client_meta.nickname << std::endl;
@@ -293,8 +294,9 @@ int main(int argc, char **argv) {
                                                 std::cerr << "Recieved out of order sequence number from client" << std::endl;
                                             }
                                         }
+                                        // make the exceptions distinct for the recvloop and the parse_ping_msg.
                                         catch (const std::exception& e ) {
-
+                                            std::cerr << "ping loop error: " << e.what() << std::endl;
                                         }
                                     }
                                 }

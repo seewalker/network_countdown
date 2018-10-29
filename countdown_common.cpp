@@ -80,19 +80,22 @@ msg_t classify(const char *buf) {
     }
 }
 
+
+// checks formatting problems with messages.
+// this can only throw invalid_argument.
 std::string validate_wrap(std::string x) {
     //check that only one newline, at the end.
     if (classify(x.c_str()) == MALFORMED) {
-        throw std::invalid_argument("Message not of known type");
+        throw std::invalid_argument("validate_wrap error : Message not of known type");
     }
     if (x[x.length()-1] != '\n') {
-        throw std::invalid_argument("Does not end in newline");
+        throw std::invalid_argument("validate_wrap error : Does not end in newline");
     }
     if (x.length() > MAX_MSGLEN) {
-        throw std::length_error("Message length exceeds limit");
+        throw std::invalid_argument("validate_wrap error : Message length exceeds limit");
     }
     if (std::count(x.begin(),x.end(),'\n') > 1) {
-        throw std::invalid_argument("Message has multiple newlines.");
+        throw std::invalid_argument("validate_wrap error : Message has multiple newlines.");
     }
     return x;
 }
@@ -117,15 +120,19 @@ std::string extract_between(std::string x,char c_begin,char c_end) {
     }
 }
 
+// only defined for strings where the unary int is non-negative (the negative is the way the error is detected.)
 int parse_unary_int(std::string target,std::string cmd) {
-    int n;
+    int n=-1;
     std::string msg_t;
     std::istringstream iss(cmd);
     iss >> msg_t;
     if (msg_t != target) {
-        throw std::domain_error(" ");
+        throw std::domain_error("parse_unary_int: Message not of expected type.");
     }
     iss >> n;
+    if (n < 0) {
+        throw std::domain_error("parse_unary_int: Could not extract the int value expected.");
+    }
     return n;
 }
 
