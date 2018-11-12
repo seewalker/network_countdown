@@ -3,16 +3,35 @@ ifeq ($(UNAME),Linux)
 CXX=clang++-6.0
 else
 CXX=clang++
-endif 
+endif
 CXXFLAGS=-std=c++17 -g -Wall
+
+# the "?=" operator allows environment variables or command line variables to "make" to override these default values.
+# default to using SSL if the openssl command line program exists.
+OPENSSL_FOUND = $(openssl no-command)
+ifeq ($(OPENSSL_FOUND),0)
+	USE_SSL ?= 1
+else
+	USE_SSL ?= 0
+endif
+
+MACROS=-DUSE_SSL=$(USE_SSL)
+TARGETS=x86_64-unknown-linux-elf
 
 all: client server
 
 client: countdown_client.cpp
-	${CXX} ${CXXFLAGS} countdown_client.cpp -o $@
+	echo "USE_SSL=${USE_SSL}"
+	${CXX} ${CXXFLAGS} ${MACROS} countdown_client.cpp -o $@
 server: countdown_server.cpp
-	${CXX} ${CXXFLAGS} countdown_server.cpp -o $@
+	echo "USE_SSL=${USE_SSL}"
+	${CXX} ${CXXFLAGS} ${MACROS} countdown_server.cpp -o $@
+test: tests.cpp
+	${CXX} ${CXXFLAGS} ${MACROS} tests.cpp -lgtest -o $@
+release:
+	$(foreach platform,$(TARGETS),${CXX} ${CXXFLAGS} ${MACROS} countdown_client.cpp -target $(platform) -o build/client_$(platform);)
+	$(foreach platform,$(TARGETS),${CXX} ${CXXFLAGS} ${MACROS} countdown_server.cpp -target $(platform) -o build/server_$(platform);)
 all: client server
 
 clean:
-	rm client server
+	rm client server test
