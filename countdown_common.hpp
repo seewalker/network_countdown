@@ -75,13 +75,16 @@ std::string validate_wrap(std::string x) {
     if (classify(x.c_str()) == MALFORMED) {
         throw std::invalid_argument("validate_wrap error : Message not of known type");
     }
-    if (x[x.length()-1] != '\n') {
+    else if (x.length() == 0) {
+        throw std::invalid_argument("validate_wrap error : Message is empty");
+    }
+    else if (x[x.length()-1] != '\n') {
         throw std::invalid_argument("validate_wrap error : Does not end in newline");
     }
-    if (x.length() > MAX_MSGLEN) {
+    else if (x.length() > MAX_MSGLEN) {
         throw std::invalid_argument("validate_wrap error : Message length exceeds limit");
     }
-    if (std::count(x.begin(),x.end(),'\n') > 1) {
+    else if (std::count(x.begin(),x.end(),'\n') > 1) {
         throw std::invalid_argument("validate_wrap error : Message has multiple newlines.");
     }
     return x;

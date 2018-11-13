@@ -6,7 +6,29 @@
 
 // EXPECT_EQ allows things to keep running, that's a nice default to start with.
 // EXPECT_FLOAT_EQ, EXPECT_NE, ASSERT_STREQ, 
+// EXPECT_THROW allows for testing a given exception occuring on bad data.
 // during the MsgTest, check that the classify function works correctly.
+
+class MessageSuite : public ::testing::Test {
+    protected:
+        void SetUp() override {
+            zero_msg = "";
+            empty_msg = "\n";
+            wrongToken_msg = "BOB -1\n";
+            long_msg.assign(MAX_MSGLEN + 1,'*');
+            long_msg = long_msg + '\n';
+            multiline_msg = "abc\n123\nboblawlawlawblog\n";
+        }
+        void TearDown() override {
+
+        }
+        std::string zero_msg;
+        std::string long_msg;
+        std::string multiline_msg;
+        std::string empty_msg;
+        std::string wrongToken_msg;
+};
+
 TEST (MsgTest, Lock) {
     std::string msg,date_repr,nick="alex";
     msg = lock_msg(nick);
@@ -45,6 +67,20 @@ TEST (MsgTest, Ping) {
     EXPECT_EQ(seq,parsed_seq);
 }
 
+TEST_F (MessageSuite,ValidateWrap) {
+    EXPECT_THROW(validate_wrap(multiline_msg),std::invalid_argument);
+    EXPECT_THROW(validate_wrap(zero_msg),std::invalid_argument);
+    EXPECT_THROW(validate_wrap(empty_msg),std::invalid_argument);
+    EXPECT_THROW(validate_wrap(long_msg),std::invalid_argument);
+    EXPECT_THROW(validate_wrap(wrongToken_msg),std::invalid_argument);
+}
+// the member variables are accessible here.
+TEST_F (MessageSuite,Ping) {
+    std::cout << "Determining if SetUp ran as expected by printing out multiline message" << std::endl << multiline_msg;
+    std::string negative_seq_msg = ping_msg(-1); //validate_wrap will not catch this, catch the exception in the parse.
+    EXPECT_THROW(parse_ping_msg(negative_seq_msg),std::domain_error);
+}
+
 TEST (CmdlineTest, Quit) {
 
 }
@@ -54,10 +90,21 @@ TEST (CmdlineTest, Write) {
 TEST (CmdlineTest, Countdown) {
 
 }
-TEST (DependencyTest, Say) {
+
+TEST (InteractiveTest,Write) {
 
 }
 
+TEST (InteractiveTest,Countdown) {
+
+}
+
+TEST (DependencyTest, Say) {
+    EXPECT_EQ(std::system("say hi"),0);
+    EXPECT_EQ(std::system("say hi to your mom"),0);
+}
+
+// these interactive tests can be ignored by running "./test --gtest_filter=-*InteractiveTest*"
 int main(int argc, char **argv) {
     ::testing::InitGoogleTest(&argc,argv);
     return RUN_ALL_TESTS();
