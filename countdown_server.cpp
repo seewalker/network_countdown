@@ -36,12 +36,14 @@
 
 
 int main(int argc, char **argv) {
+    std::string server;
     int port,ping_n;
     cxxopts::Options options("./server","A program that will coordinate a countdown.");
     // Tne number of pings applies both to the before and after of a countdown (the first one, to get up-to-date estimates on latencies. the latter to see how close it was to a successful countdown.).
     options.add_options()
         ("p,port","Port on which to listen.",cxxopts::value<int>()->default_value(DEFAULT_PORT))
         ("n,ping_n","Number of ping messages to send when estimating round trip times.",cxxopts::value<int>()->default_value(DEFAULT_PING_N))
+        ("s,server","Server IP address.",cxxopts::value<std::string>()->default_value(DEFAULT_SERVER))
         ("help", "Print help")
     ;
     auto result = options.parse(argc,argv);
@@ -52,11 +54,12 @@ int main(int argc, char **argv) {
     try {
         port = result["port"].as<int>();
         ping_n = result["ping_n"].as<int>();
+        server = result["server"].as<std::string>();
     }
     catch(cxxopts::OptionException e) {
         std::cerr << "Option Error:" << std::endl;
         std::cerr << e.what() << std::endl;
         return -1;
     }
-    return countdown_server::interact(port,ping_n);
+    return countdown_server::interact(server,port,ping_n);
 }

@@ -1,6 +1,7 @@
 #include "countdown_client.hpp"
 #include "countdown_server.hpp"
 #include "gtest/gtest.h"
+#include <unistd.h>
 
 // test to see if making and then parsing messages gets the expected values.
 
@@ -95,8 +96,48 @@ TEST (InteractiveTest,Write) {
 
 }
 
-TEST (InteractiveTest,Countdown) {
+// in the test, server doesn't really need stdin, so the stdin is of the client child process.
+// the server's standard output can also be unliked, and just having the client stdout.
+TEST (DISABLED_InteractiveTest,Countdown) {
+    const std::string SERVER = "127.0.0.1", NICKNAME = "alex";
+    const int PORT = 9050;
+    const bool CHATTY = false;
+    const int PING_N = 3;
+    // need to start child processes, and manage pipes to them.
+    // this should 
+    int client_pipes[2],pid;
+    const int PIPE_READ = 0;
+    const int PIPE_WRITE = 1;
+    if (pipe(client_pipes) < 0) {
+        perror("allocating pipe for client child process failed");
+        FAIL();
+        return;
+    }
+    pid = fork();
+    if (pid == 0) { //is the client child process.
+        if (dup2(client_pipes[PIPE_READ],STDIN_FILENO) == -1) {
+            FAIL();
+            return;
+        }
+        if (dup2(client_pipes[PIPE_WRITE],STDOUT_FILENO) == -1) {
+            FAIL();
+            return;
+        }
+        if (dup2(client_pipes[PIPE_WRITE],STDERR_FILENO) == -1) {
+            FAIL();
+            return;
+        }
+        countdown_client::interact(NICKNAME,SERVER,PORT,CHATTY);
+   }
+    else {
+        pid = fork();
+        if (pid == 0) { //is the server child process.
+            countdown_server::interact(SERVER,PORT,PING_N);
+        }
+        else { //is the parent process.
 
+        }
+    }
 }
 
 TEST (DependencyTest, Say) {

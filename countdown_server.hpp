@@ -22,10 +22,9 @@ struct client_meta {
 };
 
 // select will do just about everything we need here.
-int init_socket(int &sock,int port) {
+int init_socket(std::string server,int &sock,int port) {
     int reuse = 1;
     struct sockaddr_in addr;
-
     if ((sock = socket(AF_INET,SOCK_STREAM,0)) < 0) {
         std::cerr << "Failed to make socket" << std::endl;
         return -1;
@@ -36,7 +35,7 @@ int init_socket(int &sock,int port) {
     }
     memset(&addr,0,sizeof(addr));
     addr.sin_family = AF_INET;
-    addr.sin_addr.s_addr = inet_addr(DEFAULT_SERVER);
+    addr.sin_addr.s_addr = inet_addr(server.c_str());
     addr.sin_port = htons(port);
     if (bind(sock,(struct sockaddr*)&addr, sizeof(struct sockaddr)) != 0) {
         std::cerr << " " << std::endl;
@@ -150,7 +149,7 @@ namespace countdown_server {
         FD_ZERO(write_fds);
         FD_ZERO(except_fds);
     }
-    int interact(int port,int ping_n) {
+    int interact(std::string server,int port,int ping_n) {
         int listen_sock,hi_sock,ret,client_sock,n_countdowns=0,i,j,msglen,msglen_synch,seq,n;
         std::vector<client_meta> client_metas;
         std::experimental::optional<std::string> lock_owner = std::experimental::nullopt;
@@ -160,7 +159,7 @@ namespace countdown_server {
         fd_set read_fds,write_fds,except_fds;
         double t_delay;
         std::cout << "Starting with port = " << port << ", ping_n = " << ping_n << std::endl;
-        init_socket(listen_sock,port);
+        init_socket(server,listen_sock,port);
         while (true) {
             auto cs = client_socks(client_metas);
             countdown_server::mk_fd_sets(listen_sock,cs,&read_fds,&write_fds,&except_fds);

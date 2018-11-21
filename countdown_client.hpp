@@ -125,7 +125,7 @@ namespace countdown_client {
         srv_addr.sin_addr.s_addr = inet_addr(server.c_str());
         srv_addr.sin_port = htons(port);
         if (connect(srv_socket, (struct sockaddr *)&srv_addr, sizeof(struct sockaddr)) != 0) {
-            std::cerr << "Could not connect to server" << std::endl;
+            perror("Could not connect to server.");
             return -1;
         }
         msg = hello_msg(nickname);
