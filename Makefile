@@ -1,10 +1,12 @@
 UNAME := $(shell uname)
 ifeq ($(UNAME),Linux)
 CXX=clang++-6.0
+ARCH_FLAGS=-lpthread
 else
 CXX=clang++
+ARCH_FLAGS=
 endif
-CXXFLAGS=-std=c++17 -g -Wall
+CXXFLAGS=-std=c++17 -g -Wall ${ARCH_FLAGS}
 
 # the "?=" operator allows environment variables or command line variables to "make" to override these default values.
 # default to using SSL if the openssl command line program exists.
