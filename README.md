@@ -1,5 +1,7 @@
 # Network Countdown
 
+Note - made as a hobby thing years ago. Probably not advisable to open up ports on your PC like would be involved in using this. Not that there's much danger of random people using a half-baked project I put up here to help distribute it for using it at the time!
+
 Awhile ago I found myself watching a movie over a video chat with my (at the moment) long-distance girlfriend. To synchronize the movie, we had to use our voices to do a countdown. It felt a little silly and imprecise to do a countdown with our voices in this way. To let computers do the work, I wrote this program.
 
 ## Usage
